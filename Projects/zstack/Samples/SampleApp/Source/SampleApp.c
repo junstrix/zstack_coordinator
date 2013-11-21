@@ -182,7 +182,7 @@ void SampleApp_Init( uint8 task_id )
   // If the hardware is other parts of the device add it in main().
   MT_UartInit();
   MT_UartRegisterTaskID(task_id);
-  HalUARTWrite(0,"Hello\n",6);
+  HalUARTWrite(0,"任务开始运行\n",13);
   
  #if defined ( BUILD_ALL_DEVICES )
   // The "Demo" target is setup to have BUILD_ALL_DEVICES and HOLD_AUTO_START
@@ -390,11 +390,17 @@ void SampleApp_HandleKeys( uint8 shift, uint8 keys )
  */
 void SampleApp_MessageMSGCB( afIncomingMSGPacket_t *pkt )
 {
+  uint8 to_ascii[16]={'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};  
   uint16 flashTime;
 
   switch ( pkt->clusterId )
   {
     case SAMPLEAPP_PERIODIC_CLUSTERID:
+      HalUARTWrite(0,"接受到数据\n",11);
+      for(int i=0; i < 10; i++) {
+        HalUARTWrite(0,&to_ascii[pkt->cmd.Data[i]],1); 
+      }
+      HalUARTWrite(0,"\n",1);
       break;
 
     case SAMPLEAPP_FLASH_CLUSTERID:
