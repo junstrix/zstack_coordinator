@@ -72,6 +72,8 @@
 #include "hal_led.h"
 #include "hal_key.h"
 #include "MT_UART.h"
+//#include "MT_APP.h"
+//#include "MT.h"
 
 /*********************************************************************
  * MACROS
@@ -176,13 +178,21 @@ void SampleApp_Init( uint8 task_id )
   SampleApp_TaskID = task_id;
   SampleApp_NwkState = DEV_INIT;
   SampleApp_TransID = 0;
+  
+ /***********串口初始化************/
+  MT_UartInit();//初始化
+  MT_UartRegisterTaskID(task_id);//登记任务号
+  HalUARTWrite(0,"任务启动...\n",12);
 
+   #if defined ( IC )
+   IC_Init();  
+   #endif
+ 
+  
+  
   // Device hardware initialization can be added here or in main() (Zmain.c).
   // If the hardware is application specific - add it here.
   // If the hardware is other parts of the device add it in main().
-  MT_UartInit();
-  MT_UartRegisterTaskID(task_id);
-  HalUARTWrite(0,"任务开始运行\n",13);
   
  #if defined ( BUILD_ALL_DEVICES )
   // The "Demo" target is setup to have BUILD_ALL_DEVICES and HOLD_AUTO_START
@@ -390,17 +400,28 @@ void SampleApp_HandleKeys( uint8 shift, uint8 keys )
  */
 void SampleApp_MessageMSGCB( afIncomingMSGPacket_t *pkt )
 {
-  uint8 to_ascii[16]={'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};  
+  /*16进制转ASCII码表-网蜂*/
+  uint8 asc_16[16]={'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'},i;
+  uint8 CARD_ID[8];
+  
   uint16 flashTime;
 
   switch ( pkt->clusterId )
   {
-    case SAMPLEAPP_PERIODIC_CLUSTERID:
-      HalUARTWrite(0,"接受到数据\n",11);
-      for(int i=0; i < 10; i++) {
-        HalUARTWrite(0,&to_ascii[pkt->cmd.Data[i]],1); 
-      }
-      HalUARTWrite(0,"\n",1);
+    case SAMPLEAPP_PERIODIC_CLUSTERID:    
+    if ( SampleApp_NwkState == DEV_ZB_COORD )//如果是协调器
+    {      
+      /****16进制转ASC码********/
+      for(i=0;i<4;i++)
+      {
+        CARD_ID[i*2]=asc_16[(pkt->cmd.Data[i])/16];
+        CARD_ID[i*2+1]=asc_16[(pkt->cmd.Data[i])%16];        
+      }   
+      
+      HalUARTWrite(0,"The Card ID is: ",16);
+      HalUARTWrite(0,CARD_ID,8);
+      HalUARTWrite(0,"\n",1);               // 回车换行
+     }
       break;
 
     case SAMPLEAPP_FLASH_CLUSTERID:
