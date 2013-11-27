@@ -72,8 +72,8 @@
 #include "hal_led.h"
 #include "hal_key.h"
 #include "MT_UART.h"
-//#include "MT_APP.h"
-//#include "MT.h"
+#include "MT_APP.h"
+#include "MT.h"
 
 /*********************************************************************
  * MACROS
@@ -150,6 +150,7 @@ void SampleApp_HandleKeys( uint8 shift, uint8 keys );
 void SampleApp_MessageMSGCB( afIncomingMSGPacket_t *pckt );
 void SampleApp_SendPeriodicMessage( void );
 void SampleApp_SendFlashMessage( uint16 flashTime );
+void SampleApp_SerialCMD(mtOSALSerialData_t *cmdMsg);
 
 /*********************************************************************
  * NETWORK LAYER CALLBACKS
@@ -183,10 +184,6 @@ void SampleApp_Init( uint8 task_id )
   MT_UartInit();//初始化
   MT_UartRegisterTaskID(task_id);//登记任务号
   HalUARTWrite(0,"任务启动...\n",12);
-
-   #if defined ( IC )
-   IC_Init();  
-   #endif
  
   
   
@@ -271,11 +268,16 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
     {
       switch ( MSGpkt->hdr.event )
       {
+        
+        case CMD_SERIAL_MSG:  //串口收到数据后由MT_UART层传递过来的数据，用网蜂方法接收，编译时不定义MT相关内容，
+        SampleApp_SerialCMD((mtOSALSerialData_t *)MSGpkt);
+        break;
+        
         // Received when a key is pressed
-        case KEY_CHANGE:
-          SampleApp_HandleKeys( ((keyChange_t *)MSGpkt)->state, ((keyChange_t *)MSGpkt)->keys );
-          break;
-
+        //  case KEY_CHANGE:
+        //    SampleApp_HandleKeys( ((keyChange_t *)MSGpkt)->state, ((keyChange_t *)MSGpkt)->keys );
+        //    break;
+        
         // Received when a messages is received (OTA) for this endpoint
         case AF_INCOMING_MSG_CMD:
           SampleApp_MessageMSGCB( MSGpkt );
@@ -289,9 +291,9 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
               || (SampleApp_NwkState == DEV_END_DEVICE) )
           {
             // Start sending the periodic message in a regular interval.
-            osal_start_timerEx( SampleApp_TaskID,
-                              SAMPLEAPP_SEND_PERIODIC_MSG_EVT,
-                              SAMPLEAPP_SEND_PERIODIC_MSG_TIMEOUT );
+          //  osal_start_timerEx( SampleApp_TaskID,
+            //                  SAMPLEAPP_SEND_PERIODIC_MSG_EVT,
+              //                SAMPLEAPP_SEND_PERIODIC_MSG_TIMEOUT );
           }
           else
           {
@@ -319,7 +321,7 @@ uint16 SampleApp_ProcessEvent( uint8 task_id, uint16 events )
   if ( events & SAMPLEAPP_SEND_PERIODIC_MSG_EVT )
   {
     // Send the periodic message
-    SampleApp_SendPeriodicMessage();
+  //  SampleApp_SendPeriodicMessage();
 
     // Setup to send message again in normal period (+ a little jitter)
     osal_start_timerEx( SampleApp_TaskID, SAMPLEAPP_SEND_PERIODIC_MSG_EVT,
@@ -416,8 +418,7 @@ void SampleApp_MessageMSGCB( afIncomingMSGPacket_t *pkt )
       {
         CARD_ID[i*2]=asc_16[(pkt->cmd.Data[i])/16];
         CARD_ID[i*2+1]=asc_16[(pkt->cmd.Data[i])%16];        
-      }   
-      
+      }
       HalUARTWrite(0,"The Card ID is: ",16);
       HalUARTWrite(0,CARD_ID,8);
       HalUARTWrite(0,"\n",1);               // 回车换行
@@ -474,7 +475,7 @@ void SampleApp_SendFlashMessage( uint16 flashTime )
   buffer[2] = HI_UINT16( flashTime );
 
   if ( AF_DataRequest( &SampleApp_Flash_DstAddr, &SampleApp_epDesc,
-                       SAMPLEAPP_FLASH_CLUSTERID,
+                       SAMPLEAPP_FLASH_CLUSTERID,                       
                        3,
                        buffer,
                        &SampleApp_TransID,
@@ -488,5 +489,33 @@ void SampleApp_SendFlashMessage( uint16 flashTime )
   }
 }
 
+
+void SampleApp_SerialCMD(mtOSALSerialData_t *cmdMsg)
+{
+ uint8 i, len,*str=NULL;  //len有用数据长度
+ str=cmdMsg->msg;        //指向数据开头
+ len=*str;               //msg里的第1个字节代表后面的数据长度
+ 
+ /********打印出串口接收到的数据，用于提示*********/
+ for(i=1;i<=len;i++)
+  HalUARTWrite(0,str+i,1 ); 
+ HalUARTWrite(0,"\n",1 );//换行  
+ 
+ /*****************发送出去***参考网蜂 1小时无线数据传输教程***********************/
+  if ( AF_DataRequest( &SampleApp_Periodic_DstAddr, &SampleApp_epDesc,
+                       /* SAMPLEAPP_COM_CLUSTERID,//自己定义一个 */
+                       SAMPLEAPP_PERIODIC_CLUSTERID,
+                       len+1,                  // 数据长度         
+                       str,                    //数据内容
+                       &SampleApp_TransID, 
+                       AF_DISCV_ROUTE,
+                       AF_DEFAULT_RADIUS ) == afStatus_SUCCESS )
+  {
+  }
+  else
+  {
+    // Error occurred in request to send.
+  } 
+}
 /*********************************************************************
 *********************************************************************/
