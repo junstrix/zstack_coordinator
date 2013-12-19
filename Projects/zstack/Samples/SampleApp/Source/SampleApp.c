@@ -407,6 +407,7 @@ void SampleApp_MessageMSGCB( afIncomingMSGPacket_t *pkt )
   uint8 CARD_ID[8];
   
   uint16 flashTime;
+  uint8 len;
 
   switch ( pkt->clusterId )
   {
@@ -414,17 +415,27 @@ void SampleApp_MessageMSGCB( afIncomingMSGPacket_t *pkt )
     if ( SampleApp_NwkState == DEV_ZB_COORD )//如果是协调器
     {      
       /****16进制转ASC码********/
-      for(i=0;i<4;i++)
-      {
-        CARD_ID[i*2]=asc_16[(pkt->cmd.Data[i])/16];
-        CARD_ID[i*2+1]=asc_16[(pkt->cmd.Data[i])%16];        
-      }
-      HalUARTWrite(0,"The Card ID is: ",16);
-      HalUARTWrite(0,CARD_ID,8);
+      /*for(i=0;i<4;i++)*/
+      /*{*/
+        /*CARD_ID[i*2]=asc_16[(pkt->cmd.Data[i])/16];*/
+        /*CARD_ID[i*2+1]=asc_16[(pkt->cmd.Data[i])%16];        */
+      /*}*/
+      //HalUARTWrite(0,"The Card ID is: ",16);
+      for(i = 0; i<8; i++)
+	      HalUARTWrite(0,&pkt->cmd.Data[i],1);
+      /*HalUARTWrite(0,CARD_ID,8);*/
       HalUARTWrite(0,"\n",1);               // 回车换行
      }
       break;
-
+    case SAMPLEAPP_SERIAL_CLUSTERID:
+      if (SampleApp_NwkState == DEV_ZB_COORD)
+      {
+	len=pkt->cmd.Data[0];
+	for(i = 0; i<len; i++)
+		HalUARTWrite(0,&pkt->cmd.Data[i+1],1);
+	HalUARTWrite(0,"\n",1);
+      }
+	break;	
     case SAMPLEAPP_FLASH_CLUSTERID:
       flashTime = BUILD_UINT16(pkt->cmd.Data[1], pkt->cmd.Data[2] );
       HalLedBlink( HAL_LED_4, 4, 50, (flashTime / 4) );
@@ -492,14 +503,14 @@ void SampleApp_SendFlashMessage( uint16 flashTime )
 
 void SampleApp_SerialCMD(mtOSALSerialData_t *cmdMsg)
 {
- uint8 i, len,*str=NULL;  //len有用数据长度
+ uint8 len,*str=NULL;  //len有用数据长度
  str=cmdMsg->msg;        //指向数据开头
  len=*str;               //msg里的第1个字节代表后面的数据长度
  
  /********打印出串口接收到的数据，用于提示*********/
- for(i=1;i<=len;i++)
-  HalUARTWrite(0,str+i,1 ); 
- HalUARTWrite(0,"\n",1 );//换行  
+// for(i=1;i<=len;i++)
+//  HalUARTWrite(0,str+i,1 ); 
+// HalUARTWrite(0,"\n",1 );//换行  
  
  /*****************发送出去***参考网蜂 1小时无线数据传输教程***********************/
   if ( AF_DataRequest( &SampleApp_Periodic_DstAddr, &SampleApp_epDesc,
